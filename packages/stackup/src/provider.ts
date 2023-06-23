@@ -102,9 +102,10 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
         ? this.account.encodeBatchExecute(data)
         : this.account.encodeExecute(data.target, data.value ?? 0n, data.data),
       signature: this.account.getDummySignature(),
-      callGasLimit: 0n,
-      preVerificationGas: 0n,
-      verificationGasLimit: 0n,
+      // default stackup gas limits for eth_estimateUserOperationGas
+      callGasLimit: 35000n,
+      preVerificationGas: 21000n,
+      verificationGasLimit: 70000n,
     } as UserOperationStruct);
 
     const request = deepHexlify(await resolveProperties(uoStruct));

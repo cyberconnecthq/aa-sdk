@@ -37,6 +37,7 @@ export class KernelAccountProvider extends SmartAccountProvider<HttpTransport> {
           "cannot sign for address that is not the current account"
         );
       }
+      // TODO: fix with generic on SmartAccountProvider
       // @ts-ignore
       return this.account.signWithEip6492(data);
     } else {
