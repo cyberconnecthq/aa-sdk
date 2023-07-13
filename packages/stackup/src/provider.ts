@@ -5,8 +5,8 @@ import {
   type UserOperationCallData,
   type BatchUserOperationCallData,
   type SendUserOperationResult,
-  asyncPipe,
-  noOpMiddleware,
+  // asyncPipe,
+  // noOpMiddleware,
   type UserOperationStruct,
   getUserOperationHash,
   type UserOperationRequest,
@@ -82,31 +82,78 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
   // override sendUserOperation to match stackup bundler rpc endpoint (eth_estimateUserOperationGas)
   sendUserOperation = async (
     data: UserOperationCallData | BatchUserOperationCallData
-  ): Promise<SendUserOperationResult> => {
+  ): Promise<SendUserOperationResult | null> => {
     if (!this.account) {
       throw new Error("account not connected!");
     }
+    let uoStruct;
 
-    const initCode = await this.account.getInitCode();
-    const uoStruct = await asyncPipe(
-      this.dummyPaymasterDataMiddleware,
-      this.feeDataGetter, // change order to fill the gas fee data first before estimate gas
-      this.gasEstimator,
-      this.paymasterDataMiddleware,
-      this.customMiddleware ?? noOpMiddleware
-    )({
-      initCode,
-      sender: this.getAddress(),
-      nonce: this.account.getNonce(),
-      callData: Array.isArray(data)
+    const baseUoStruct = await Promise.all([
+      this.account.getInitCode(),
+      this.getAddress(),
+      this.account.getNonce(),
+      Array.isArray(data)
         ? this.account.encodeBatchExecute(data)
         : this.account.encodeExecute(data.target, data.value ?? 0n, data.data),
-      signature: this.account.getDummySignature(),
-      // default stackup gas limits for eth_estimateUserOperationGas
-      callGasLimit: 35000n,
-      preVerificationGas: 21000n,
-      verificationGasLimit: 70000n,
-    } as UserOperationStruct);
+      this.account.getDummySignature(),
+      this.feeDataGetter({} as any), // change order to fill the gas fee data first before estimate gas
+      this.gasEstimator({} as any),
+    ]);
+
+    if (baseUoStruct?.length) {
+      const initCode = baseUoStruct[0];
+      const sender = baseUoStruct[1];
+      const nonce = baseUoStruct[2];
+      const callData = baseUoStruct[3];
+      const signature = baseUoStruct[4];
+      const { maxFeePerGas, maxPriorityFeePerGas } = baseUoStruct[5];
+      const { callGasLimit, preVerificationGas, verificationGasLimit } =
+        baseUoStruct[6];
+      const paymasterAndData = "0x";
+
+      const uo = {
+        initCode,
+        sender,
+        nonce,
+        callData,
+        signature,
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+        callGasLimit,
+        preVerificationGas,
+        verificationGasLimit,
+        paymasterAndData,
+      };
+
+      const paymasterData = await this.paymasterDataMiddleware(uo);
+
+      uoStruct = { ...uo, ...paymasterData };
+    }
+
+    if (!uoStruct) {
+      return null;
+    }
+
+    // const initCode = await this.account.getInitCode();
+    // const uoStruct = await asyncPipe(
+    //   this.dummyPaymasterDataMiddleware,
+    //   this.feeDataGetter, // change order to fill the gas fee data first before estimate gas
+    //   this.gasEstimator,
+    //   this.paymasterDataMiddleware,
+    //   this.customMiddleware ?? noOpMiddleware
+    // )({
+    //   initCode,
+    //   sender: this.getAddress(),
+    //   nonce: this.account.getNonce(),
+    //   callData: Array.isArray(data)
+    //     ? this.account.encodeBatchExecute(data)
+    //     : this.account.encodeExecute(data.target, data.value ?? 0n, data.data),
+    //   signature: this.account.getDummySignature(),
+    //   // default stackup gas limits for eth_estimateUserOperationGas
+    //   callGasLimit: 35000n,
+    //   preVerificationGas: 21000n,
+    //   verificationGasLimit: 70000n,
+    // } as UserOperationStruct);
 
     const request = deepHexlify(await resolveProperties(uoStruct));
     if (!isValidRequest(request)) {
@@ -159,7 +206,6 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
         "StackupProvider: account is not set, did you call `connect` first?"
       );
     }
-
     return withStackupGasManager(this, config);
   }
 }
