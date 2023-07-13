@@ -1,3 +1,4 @@
+import type { UserOperationStruct } from "@alchemy/aa-core";
 import {
   deepHexlify,
   resolveProperties,
@@ -23,6 +24,7 @@ type StackupPaymasterContext =
 
 type StackupPaymasterContextPayAsYouGo = {
   type: "payg";
+  chainId?: Chain["id"];
 };
 
 type StackupPaymasterContextERC20Token = {
@@ -43,6 +45,7 @@ type ClientWithStackupMethods = PublicErc4337Client & {
 export interface StackupGasManagerConfig {
   entryPoint: Address;
   client: StackupPaymasterClient;
+  chainId?: Chain["id"];
 }
 
 export interface StackupPaymasterClient<
@@ -125,12 +128,13 @@ export const withStackupGasManager = <
         verificationGasLimit: 0n,
       }))
       .withPaymasterMiddleware({
-        paymasterDataMiddleware: async (struct) => {
+        paymasterDataMiddleware: async (struct: UserOperationStruct) => {
           return config.client.getSponsorUserOperation(
             deepHexlify(await resolveProperties(struct)),
             config.entryPoint,
             {
               type: "payg",
+              chainId: config.chainId,
             }
           );
         },
