@@ -10,10 +10,12 @@ import {
   optimismGoerli,
   polygon,
   polygonMumbai,
+  baseGoerli,
 } from "viem/chains";
 import { GasFeeStrategy, type GasFeeMode } from "./middleware/gas-fees.js";
 
 export const SupportedChains = new Map<number, Chain>([
+  [baseGoerli.id, baseGoerli],
   [polygonMumbai.id, polygonMumbai],
   [polygon.id, polygon],
   [mainnet.id, mainnet],
