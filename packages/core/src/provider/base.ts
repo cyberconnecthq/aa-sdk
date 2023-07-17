@@ -152,7 +152,10 @@ export class SmartAccountProvider<
       value: request.value ? fromHex(request.value, "bigint") : 0n,
     });
 
-    return await this.waitForUserOperationTransaction(hash as Hash);
+    // Handle by Backend, no need to wait for receipt (For CyberConnect Only)
+    return hash as Hash;
+
+    // return await this.waitForUserOperationTransaction(hash as Hash);
   };
 
   sendTransactions = async (requests: RpcTransactionRequest[]) => {
@@ -288,8 +291,11 @@ export class SmartAccountProvider<
   };
 
   readonly feeDataGetter: AccountMiddlewareFn = async (struct) => {
-    const maxPriorityFeePerGas = await this.rpcClient.getMaxPriorityFeePerGas();
-    const feeData = await this.rpcClient.getFeeData();
+    const [maxPriorityFeePerGas, feeData] = await Promise.all([
+      this.rpcClient.getMaxPriorityFeePerGas(),
+      this.rpcClient.getFeeData(),
+    ]);
+
     if (!feeData.maxFeePerGas || !feeData.maxPriorityFeePerGas) {
       throw new Error(
         "feeData is missing maxFeePerGas or maxPriorityFeePerGas"

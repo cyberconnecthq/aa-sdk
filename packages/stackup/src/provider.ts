@@ -80,6 +80,7 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
   }
 
   // override sendUserOperation to match stackup bundler rpc endpoint (eth_estimateUserOperationGas)
+  // @ts-ignore
   sendUserOperation = async (
     data: UserOperationCallData | BatchUserOperationCallData
   ): Promise<SendUserOperationResult | null> => {

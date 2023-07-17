@@ -27,14 +27,17 @@ export const withStackupFeeData = (
   }
 
   provider.withFeeDataGetter(async () => {
-    const block = await provider.rpcClient.getBlock({ blockTag: "latest" });
+    const [block, maxPriorityFeePerGasOnChain] = await Promise.all([
+      provider.rpcClient.getBlock({ blockTag: "latest" }),
+      provider.rpcClient.getMaxPriorityFeePerGas(),
+    ]);
     const baseFeePerGas = block.baseFeePerGas;
     if (baseFeePerGas == null) {
       throw new Error("baseFeePerGas is null");
     }
     // add a buffer here to account for potential spikes in priority fee
     const maxPriorityFeePerGas =
-      (BigInt(await provider.rpcClient.getMaxPriorityFeePerGas()) *
+      (BigInt(maxPriorityFeePerGasOnChain) *
         (100n + maxPriorityFeeBufferPercent)) /
       100n;
     // add 25% overhead to ensure mine
