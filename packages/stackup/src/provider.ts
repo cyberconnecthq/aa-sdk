@@ -135,27 +135,6 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
       return null;
     }
 
-    // const initCode = await this.account.getInitCode();
-    // const uoStruct = await asyncPipe(
-    //   this.dummyPaymasterDataMiddleware,
-    //   this.feeDataGetter, // change order to fill the gas fee data first before estimate gas
-    //   this.gasEstimator,
-    //   this.paymasterDataMiddleware,
-    //   this.customMiddleware ?? noOpMiddleware
-    // )({
-    //   initCode,
-    //   sender: this.getAddress(),
-    //   nonce: this.account.getNonce(),
-    //   callData: Array.isArray(data)
-    //     ? this.account.encodeBatchExecute(data)
-    //     : this.account.encodeExecute(data.target, data.value ?? 0n, data.data),
-    //   signature: this.account.getDummySignature(),
-    //   // default stackup gas limits for eth_estimateUserOperationGas
-    //   callGasLimit: 35000n,
-    //   preVerificationGas: 21000n,
-    //   verificationGasLimit: 70000n,
-    // } as UserOperationStruct);
-
     const request = deepHexlify(await resolveProperties(uoStruct));
     if (!isValidRequest(request)) {
       // this pretty prints the uo
