@@ -25,6 +25,7 @@ type StackupPaymasterContext =
 type StackupPaymasterContextPayAsYouGo = {
   type: "payg";
   chainId?: Chain["id"];
+  sponsorSig: string;
 };
 
 type StackupPaymasterContextERC20Token = {
@@ -46,6 +47,7 @@ export interface StackupGasManagerConfig {
   entryPoint: Address;
   client: StackupPaymasterClient;
   chainId?: Chain["id"];
+  sponsorSig: string;
 }
 
 export interface StackupPaymasterClient<
@@ -135,6 +137,7 @@ export const withStackupGasManager = <
             {
               type: "payg",
               chainId: config.chainId,
+              sponsorSig: config.sponsorSig,
             }
           );
         },
