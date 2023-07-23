@@ -108,5 +108,10 @@ export interface PublicErc4337Client<T extends SupportedTransports = Transport>
     maxPriorityFeePerGas?: BigNumberish;
   }>;
 
+  getFeeDataFromPimlico(): Promise<{
+    maxFeePerGas?: BigNumberish;
+    maxPriorityFeePerGas?: BigNumberish;
+  }>;
+
   getContractCode(address: string): Promise<Hex | `0x`>;
 }

@@ -99,6 +99,7 @@ export class SmartAccountProvider<
             rpcUrl: rpcProvider,
           })
         : rpcProvider;
+
   }
 
   request: (args: { method: string; params?: any[] }) => Promise<any> = async (

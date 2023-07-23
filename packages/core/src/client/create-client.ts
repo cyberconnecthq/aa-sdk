@@ -36,6 +36,7 @@ export const createPublicErc4337FromClient: <
 
   return {
     ...clientAdapter,
+
     estimateUserOperationGas(
       request: UserOperationRequest,
       entryPoint: string
@@ -84,6 +85,19 @@ export const createPublicErc4337FromClient: <
       });
     },
 
+    async getFeeDataFromPimlico(): Promise<{
+      maxFeePerGas?: BigNumberish;
+      maxPriorityFeePerGas?: BigNumberish;
+    }> {
+      const res = await clientAdapter.request({
+        // @ts-ignore
+        method: "pimlico_getUserOperationGasPrice",
+        params: [],
+      });
+
+      //@ts-ignore
+      return res?.fast || {};
+    },
     async getFeeData(): Promise<{
       maxFeePerGas?: BigNumberish;
       maxPriorityFeePerGas?: BigNumberish;
