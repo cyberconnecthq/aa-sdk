@@ -11,8 +11,24 @@ import {
   polygon,
   polygonMumbai,
   baseGoerli,
+  lineaTestnet,
 } from "viem/chains";
 import { GasFeeStrategy, type GasFeeMode } from "./middleware/gas-fees.js";
+
+const linea = {
+  id: 59144,
+  name: "Linea",
+  rpcUrls: {
+    infura: { http: "https://rpc.linea.build" },
+    public: { http: "https://rpc.linea.build" },
+    default: { http: "https://rpc.linea.build" },
+  },
+  nativeCurrency: {
+    name: "Ethereum",
+    symbol: "ETH",
+    decimals: 18,
+  },
+};
 
 export const SupportedChains = new Map<number, Chain>([
   [baseGoerli.id, baseGoerli],
@@ -27,6 +43,8 @@ export const SupportedChains = new Map<number, Chain>([
   // not sure how bsc supports eip-1559
   [bsc.id, bsc],
   [bscTestnet.id, bscTestnet],
+  [lineaTestnet.id, lineaTestnet],
+  [linea.id, linea] as any,
 ]);
 
 const defineChainStrategy = (
@@ -53,4 +71,5 @@ export const ChainFeeStrategies: Map<number, GasFeeMode> = new Map<
   defineChainStrategy(optimism.id, GasFeeStrategy.BASE_FEE_PERCENTAGE, 5n),
   defineChainStrategy(arbitrum.id, GasFeeStrategy.BASE_FEE_PERCENTAGE, 5n),
   defineChainStrategy(bsc.id, GasFeeStrategy.FIXED, 0n),
+  defineChainStrategy(lineaTestnet.id, GasFeeStrategy.FIXED, 0n),
 ]);

@@ -47,7 +47,9 @@ export type StackupProviderConfig = {
   entryPointAddress: Address;
   account?: BaseSmartContractAccount;
   rpcProvider: string | PublicErc4337Client;
+  bundlerProvider?: PublicErc4337Client;
   opts?: SmartAccountProviderOpts;
+  isPimlico?: boolean;
   feeOpts?: {
     /** this adds a percent buffer on top of the fee estimated (default 5%)*/
     maxPriorityFeeBufferPercent?: bigint;
@@ -62,12 +64,18 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
     account,
     opts,
     feeOpts,
+    bundlerProvider,
+    isPimlico,
   }: StackupProviderConfig) {
     const _chain = SupportedChains.get(chain.id);
     if (!_chain) {
       throw new Error(`StackupProvider: chain (${chain}) not supported`);
     }
     super(rpcProvider, entryPointAddress, _chain, account, opts);
+    // @ts-ignore
+    this.bundlerProvider = bundlerProvider;
+    // @ts-ignore
+    this.isPimlico = isPimlico;
 
     withStackupFeeData(
       this,
@@ -78,7 +86,6 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
       feeOpts?.maxPriorityFeeBufferPercent ?? 5n
     );
   }
-
   // override sendUserOperation to match stackup bundler rpc endpoint (eth_estimateUserOperationGas)
   // @ts-ignore
   sendUserOperation = async (
@@ -97,7 +104,12 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
         ? this.account.encodeBatchExecute(data)
         : this.account.encodeExecute(data.target, data.value ?? 0n, data.data),
       this.account.getDummySignature(),
-      this.feeDataGetter({} as any), // change order to fill the gas fee data first before estimate gas
+      // @ts-ignore
+      this.isPimlico
+        ? // @ts-ignore
+          this.bundlerProvider.getFeeDataFromPimlico()
+        : this.feeDataGetter({} as any), // change order to fill the gas fee data first before estimate gas
+
       this.gasEstimator({} as any),
     ]);
 
@@ -134,7 +146,9 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
     if (!uoStruct) {
       return null;
     }
-
+    // +----------------------------------------------------------+
+    // |                                                          |
+    // +----------------------------------------------------------+
     const request = deepHexlify(await resolveProperties(uoStruct));
     if (!isValidRequest(request)) {
       // this pretty prints the uo
@@ -156,12 +170,121 @@ export class StackupProvider extends SmartAccountProvider<HttpTransport> {
     )) as `0x${string}`;
 
     return {
-      hash: await this.rpcClient.sendUserOperation(
-        request,
-        this.entryPointAddress
-      ),
+      //@ts-ignore
+      hash: this.bundlerProvider
+        ? //@ts-ignore
+          await this.bundlerProvider.sendUserOperation(
+            request,
+            this.entryPointAddress
+          )
+        : await this.rpcClient.sendUserOperation(
+            request,
+            this.entryPointAddress
+          ),
       request,
     };
+  };
+
+  // override sendUserOperation to match stackup bundler rpc endpoint (eth_estimateUserOperationGas)
+  // @ts-ignore
+  estimateUserOperation = async (
+    data: UserOperationCallData | BatchUserOperationCallData
+    // @ts-ignore
+  ): Promise<SendUserOperationResult | null> => {
+    if (!this.account) {
+      throw new Error("account not connected!");
+    }
+
+    const baseUoStruct = await Promise.all([
+      this.account.getInitCode(),
+      this.getAddress(),
+      this.account.getNonce(),
+      Array.isArray(data)
+        ? this.account.encodeBatchExecute(data)
+        : this.account.encodeExecute(data.target, data.value ?? 0n, data.data),
+      this.account.getDummySignature(),
+      // @ts-ignore
+      this.isPimlico
+        ? // @ts-ignore
+          this.bundlerProvider.getFeeDataFromPimlico()
+        : this.feeDataGetter({} as any), // change order to fill the gas fee data first before estimate gas
+      this.gasEstimator({} as any),
+    ]);
+
+    if (baseUoStruct?.length) {
+      const initCode = baseUoStruct[0];
+      const sender = baseUoStruct[1];
+      const nonce = baseUoStruct[2];
+      const callData = baseUoStruct[3];
+      const signature = baseUoStruct[4];
+      const { maxFeePerGas, maxPriorityFeePerGas } = baseUoStruct[5];
+      const { callGasLimit, preVerificationGas, verificationGasLimit } =
+        baseUoStruct[6];
+      const paymasterAndData = "0x";
+
+      const uo = {
+        initCode,
+        sender,
+        nonce,
+        callData,
+        signature,
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+        callGasLimit,
+        preVerificationGas,
+        verificationGasLimit,
+        paymasterAndData,
+      };
+
+      //@ts-ignore
+      if (this.paymasterEstimator) {
+        //@ts-ignore
+        return await this.paymasterEstimator(uo);
+      }
+
+      return null;
+
+      // uoStruct = { ...uo, ...paymasterData };
+    }
+
+    // if (!uoStruct) {
+    //   return null;
+    // }
+    //
+    // const request = deepHexlify(await resolveProperties(uoStruct));
+    // if (!isValidRequest(request)) {
+    //   // this pretty prints the uo
+    //   throw new Error(
+    //     `Request is missing parameters. All properties on UserOperationStruct must be set. uo: ${JSON.stringify(
+    //       request,
+    //       null,
+    //       2
+    //     )}`
+    //   );
+    // }
+    //
+    // request.signature = (await this.account.signMessage(
+    //   getUserOperationHash(
+    //     request,
+    //     this.entryPointAddress as `0x${string}`,
+    //     BigInt(this.chain.id)
+    //   )
+    // )) as `0x${string}`;
+    //
+    // return {
+    //   //@ts-ignore
+    //   hash: this.bundlerProvider
+    //     ? //@ts-ignore
+    //       await this.bundlerProvider.sendUserOperation(
+    //         request,
+    //         this.entryPointAddress
+    //       )
+    //     : await this.rpcClient.sendUserOperation(
+    //         request,
+    //         this.entryPointAddress
+    //       ),
+    //   request,
+    // };
   };
 
   // override gasEstimator to match stackup bundler rpc endpoint (eth_estimateUserOperationGas)

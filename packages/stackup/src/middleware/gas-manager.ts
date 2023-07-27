@@ -58,6 +58,11 @@ export interface StackupPaymasterClient<
     entryPoint: string,
     context: StackupPaymasterContext
   ): Promise<StackupPaymasterResponse>;
+  estimateCredit(
+    request: UserOperationRequest,
+    entryPoint: string,
+    context: StackupPaymasterContext
+  ): Promise<StackupPaymasterResponse>;
 }
 
 type StackupPaymasterResponse = {
@@ -103,6 +108,16 @@ export const createStackupPaymasterClientFromClient: <
         params: [request, entryPoint, context],
       });
     },
+    estimateCredit(
+      request: UserOperationRequest,
+      entryPoint: Address,
+      context: StackupPaymasterContext
+    ): Promise<StackupPaymasterResponse> {
+      return clientAdapter.request({
+        method: "pm_estimateCredit" as any,
+        params: [request, entryPoint, context],
+      });
+    },
   } as StackupPaymasterClient<T>;
 };
 
@@ -132,6 +147,19 @@ export const withStackupGasManager = <
       .withPaymasterMiddleware({
         paymasterDataMiddleware: async (struct: UserOperationStruct) => {
           return config.client.getSponsorUserOperation(
+            deepHexlify(await resolveProperties(struct)),
+            config.entryPoint,
+            {
+              type: "payg",
+              chainId: config.chainId,
+              sponsorSig: config.sponsorSig,
+            }
+          );
+        },
+        //@ts-ignore
+        paymasterEstimator: async (struct: UserOperationStruct) => {
+          console.log("Estimating gas credit");
+          return config.client.estimateCredit(
             deepHexlify(await resolveProperties(struct)),
             config.entryPoint,
             {

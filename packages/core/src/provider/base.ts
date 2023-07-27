@@ -99,7 +99,6 @@ export class SmartAccountProvider<
             rpcUrl: rpcProvider,
           })
         : rpcProvider;
-
   }
 
   request: (args: { method: string; params?: any[] }) => Promise<any> = async (
@@ -141,6 +140,26 @@ export class SmartAccountProvider<
     return this.account.getAddress();
   };
 
+  estimateTransaction = async (
+    request: RpcTransactionRequest
+  ): Promise<unknown> => {
+    if (!request.to) {
+      throw new Error("transaction is missing to address");
+    }
+
+    //@ts-ignore
+    const res = await this.estimateUserOperation({
+      target: request.to,
+      data: request.data ?? "0x",
+      value: request.value ? fromHex(request.value, "bigint") : 0n,
+    });
+
+    // Handle by Backend, no need to wait for receipt (For CyberConnect Only)
+    return res as unknown;
+
+    // return await this.waitForUserOperationTransaction(hash as Hash);
+  };
+
   sendTransaction = async (request: RpcTransactionRequest): Promise<Hash> => {
     if (!request.to) {
       throw new Error("transaction is missing to address");
@@ -153,10 +172,10 @@ export class SmartAccountProvider<
       value: request.value ? fromHex(request.value, "bigint") : 0n,
     });
 
-    // Handle by Backend, no need to wait for receipt (For CyberConnect Only)
-    return hash as Hash;
+    // // Handle by Backend, no need to wait for receipt (For CyberConnect Only)
+    // return hash as Hash;
 
-    // return await this.waitForUserOperationTransaction(hash as Hash);
+    return await this.waitForUserOperationTransaction(hash as Hash);
   };
 
   sendTransactions = async (requests: RpcTransactionRequest[]) => {
@@ -185,14 +204,18 @@ export class SmartAccountProvider<
       await new Promise((resolve) =>
         setTimeout(resolve, this.txRetryIntervalMs)
       );
-      const receipt = await this.rpcClient
-        .getUserOperationReceipt(hash as `0x${string}`)
+      //@ts-ignore
+      const res = await this.bundlerProvider
+        //@ts-ignore
+        ?.getUserOperationByHash(hash as `0x${string}`)
         // TODO: should maybe log the error?
         .catch(() => null);
-      if (receipt) {
-        return this.rpcClient
-          .getTransaction({ hash: receipt.receipt.transactionHash })
-          .then((x) => x.hash);
+
+      if (res) {
+        return res.transactionHash;
+        //  return this.rpcClient
+        //    .getTransaction({ hash: receipt.receipt.transactionHash })
+        //    .then((x) => x.hash);
       }
     }
 
@@ -325,6 +348,7 @@ export class SmartAccountProvider<
   withPaymasterMiddleware = (overrides: {
     dummyPaymasterDataMiddleware?: PaymasterAndDataMiddleware;
     paymasterDataMiddleware?: PaymasterAndDataMiddleware;
+    paymasterEstimator?: any;
   }): this => {
     const newDummyMiddleware = overrides.dummyPaymasterDataMiddleware
       ? this.overrideMiddlewareFunction(overrides.dummyPaymasterDataMiddleware)
@@ -336,6 +360,14 @@ export class SmartAccountProvider<
       : this.paymasterDataMiddleware;
     defineReadOnly(this, "paymasterDataMiddleware", newPaymasterMiddleware);
 
+    const newPaymasterEstimator = overrides.paymasterEstimator
+      ? this.overrideMiddlewareFunction(overrides.paymasterEstimator)
+      : undefined;
+
+    if (newPaymasterEstimator) {
+      //@ts-ignore
+      defineReadOnly(this, "paymasterEstimator", newPaymasterEstimator);
+    }
     return this;
   };
 

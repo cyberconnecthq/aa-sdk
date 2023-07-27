@@ -1,6 +1,6 @@
 {
   "name": "aa-stackup",
-  "version": "0.0.5",
+  "version": "0.0.21",
   "description": "adapters for @alchemy/aa-core for interacting with stackup services",
   "author": "Ryan",
   "license": "MIT",

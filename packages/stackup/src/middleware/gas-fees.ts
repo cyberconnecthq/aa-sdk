@@ -41,7 +41,7 @@ export const withStackupFeeData = (
         (100n + maxPriorityFeeBufferPercent)) /
       100n;
     // add 25% overhead to ensure mine
-    const baseFeeScaled = (baseFeePerGas * 5n) / 4n;
+    const baseFeeScaled = baseFeePerGas * 2n;
 
     const prioFee = ((): bigint => {
       switch (feeMode.strategy) {
